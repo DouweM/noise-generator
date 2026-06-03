@@ -6,7 +6,7 @@ from copy import deepcopy
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall
 
 from .const import (
     CONF_PROFILE_NAME,
@@ -17,11 +17,26 @@ from .const import (
 from .noise import coerce_profile
 from .stream import NoiseStreamManager, NoiseStreamView
 
+SERVICE_STOP = "stop"
+
 
 async def async_setup(hass: HomeAssistant, _: dict[str, Any]) -> bool:
     """Set up the integration via YAML (not supported)."""
 
     hass.data.setdefault(DOMAIN, {"entries": {}, "view": None})
+
+    async def async_stop_service(_call: ServiceCall) -> None:
+        """Close all active noise streams across all entries."""
+
+        domain_data = hass.data.get(DOMAIN, {})
+        for stored in domain_data.get("entries", {}).values():
+            manager: NoiseStreamManager | None = stored.get("manager")
+            if manager is not None:
+                await manager.async_stop_all_streams()
+
+    if not hass.services.has_service(DOMAIN, SERVICE_STOP):
+        hass.services.async_register(DOMAIN, SERVICE_STOP, async_stop_service)
+
     return True
 
 
