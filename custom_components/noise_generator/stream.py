@@ -176,12 +176,18 @@ class NoiseStreamManager:
         return response
 
     async def async_stop_all_streams(self) -> None:
-        """Close any active stream handles without shutting down the manager."""
+        """Close any active stream handles without shutting down the manager.
+
+        Closes happen in the background so callers (e.g. the noise_generator.stop
+        service) return immediately and the HA UI can reflect intent without
+        waiting for subprocess termination.
+        """
 
         handles = list(self._handles)
         if not handles:
             return
-        await asyncio.gather(*(handle.close() for handle in handles), return_exceptions=True)
+        for handle in handles:
+            self.hass.async_create_task(handle.close())
         self._handles.clear()
 
     async def async_shutdown(self) -> None:
@@ -300,7 +306,7 @@ class _ProcessStreamHandle(_BaseStreamHandle):
         if process.returncode is None:
             process.terminate()
             try:
-                await asyncio.wait_for(process.wait(), timeout=5)
+                await asyncio.wait_for(process.wait(), timeout=1)
             except asyncio.TimeoutError:
                 process.kill()
                 await process.wait()
