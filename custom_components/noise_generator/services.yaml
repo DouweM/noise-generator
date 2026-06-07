@@ -1,0 +1,5 @@
+stop:
+  name: Stop
+  description: >-
+    Stop all active noise streams. Closes the open streaming responses so
+    speakers fetching the stream URL stop receiving audio.
